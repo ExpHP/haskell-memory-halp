@@ -1,0 +1,24 @@
+#!/bin/bash
+
+stack build --executable-profiling || exit 1
+
+stack ghc --ghc-package-path --package=haskell-halp -- \
+	app/Attempt1.hs -o attempt1 \
+	-fexternal-interpreter \
+	-prof -fprof-auto -fprof-cafs \
+	|| exit 1
+
+stack ghc --ghc-package-path --package=haskell-halp -- \
+	app/Attempt2.hs -o attempt2 \
+	-fexternal-interpreter \
+	-prof -fprof-auto -fprof-cafs \
+	|| exit 1
+
+for s in attempt1 attempt2; do
+	echo ">>> getting memory profile of $s <<<"
+	./$s +RTS -hc -RTS "$@"
+	echo ">>> getting prof output of $s <<<"
+	./$s +RTS -p -RTS "$@"
+
+	hp2ps -c $s.hp
+done

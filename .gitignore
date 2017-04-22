@@ -1,0 +1,9 @@
+attempt1
+attempt2
+*.hp
+*.prof
+*.aux
+*.hi
+*.o
+.stack-work
+band.yaml

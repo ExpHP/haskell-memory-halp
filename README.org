@@ -1,0 +1,26 @@
+* haskell-halp
+
+memory errors trying to parse a big yaml file with the `yaml` package
+
+** Files
+
+- app/attempt1 :: attempt using plain data structures that map directly to the YAML.
+                  (originally handcoded, this has now been rewritten to use Aeson's
+                   TemplateHaskell functions, with no discernable effect on the outcome)
+- app/attempt2 :: attempt using a fromJSON implementation that extracts only the
+                  data I want.
+
+In my main source tree I also tried using an unboxed vector for the innermost `Vector (Complex Double)`.
+This still did not help.
+
+** Running
+
+Watch a 4 MB test file take up 80 MB of "pinned" memory (bytestrings?):
+
+#+BEGIN_SRC bash
+    ./makeit 10 90 30
+#+END_SRC
+
+[[./saved/attempt1.ps]]
+
+Larger numbers make a bigger file.
