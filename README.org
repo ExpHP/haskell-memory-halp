@@ -2,6 +2,21 @@
 
 memory errors trying to parse a big yaml file with the `yaml` package
 
+** Status
+
+I have *identified the source* of the high memory usage:  the initial construction of an Aeson Value.
+
+Unfortunately, this initial Value seems to be central to pretty much the entire Aeson API, so *I'm now trying to work around it with streaming APIs.*  This is not fun.
+
+There currently appears to be a *[[https://github.com/ExpHP/haskell-memory-halp/blob/master/app/Attempt4.hs#L269-L282][single missing piece]]* before I can finally test what I've written.  It should take a continuation parser of type [[https://hackage.haskell.org/package/conduit-parse-0.1.2.0/docs/Data-Conduit-Parser.html][ConduitParser Event m a]] and supply it with the events of exactly one node from the [[https://hackage.haskell.org/package/yaml-0.8.22/docs/Text-Libyaml.html][Libyaml stream]] (leaving the rest of the stream after this node undisturbed).
+
+Notice that:
+
+ * ConduitParser is a wrapper around ~Sink~ (hence: no piping mechanism)
+ * ...yet cannot (?) be constructed from one (hence: can't do e.g. ~ConduitParser $ a .| b~)
+ 
+And for these reasons I'm beginning to think that these "key missing functions" are impossible...
+
 ** Running
 
 Watch a 4 MB test file take up 80 MB of "pinned" memory (bytestrings?):
