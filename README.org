@@ -10,7 +10,7 @@ Watch a 4 MB test file take up 80 MB of "pinned" memory (bytestrings?):
     ./makeit 10 90 30
 #+END_SRC
 
-[[./saved/attempt1.svg]]
+[[https://rawgit.com/ExpHP/haskell-memory-halp/master/saved/attempt1.svg]]
 
 Larger numbers make a bigger file.
 
