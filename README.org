@@ -17,12 +17,12 @@ Larger numbers make a bigger file.
 ** Files
 
 - app/Attempt1 ::
-  (rendered pointless by Attempt3)
+  *(rendered pointless by Attempt3)*
   attempt using plain data structures that map directly to the YAML.
   (originally handcoded, this has now been rewritten to use Aeson's
   TemplateHaskell functions, with no discernable effect on the outcome)
 - app/Attempt2 ::
-  (rendered pointless by Attempt3)
+  *(rendered pointless by Attempt3)*
   attempt using a fromJSON implementation that extracts only the data I want.
 - app/Attempt3 ::
   I write the trivial parser ~Value -> Parser Value~, and discover that
