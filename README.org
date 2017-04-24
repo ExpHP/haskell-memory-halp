@@ -32,9 +32,14 @@ Watch a 4 MB test file take up 80 MB of "pinned" memory (bytestrings?):
     ./makeit 10 90 30
 #+END_SRC
 
-[[https://rawgit.com/ExpHP/haskell-memory-halp/master/saved/attempt1.svg]]
+The (Very Bad (TM)!) memory profile of ~parseJSON :: Parser Value~
 
-Larger numbers make a bigger file.
+[[https://rawgit.com/ExpHP/haskell-memory-halp/master/saved/attempt3.svg]]
+
+The (Very Good (TM)!) constant memory profile of the Libyaml conduit.
+(the theoretical hard lower bound for my current strategy)
+
+[[https://rawgit.com/ExpHP/haskell-memory-halp/master/saved/attempt4.svg]]
 
 ** Files
 

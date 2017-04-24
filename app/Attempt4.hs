@@ -275,11 +275,11 @@ limitMappingValueImpl label cont = bracketAnchorlessMapping $ succeedEventually
 --
 -- << bangs head against wall repeatedly >>
 limitStream, limitDocument, limitNode, limitSequence, limitMapping :: ParserCont
-limitStream   = error "TODO: limitStream"
-limitDocument = error "TODO: limitDocument"
-limitNode     = error "TODO: limitNode"      -- <-- THE SINGLE MISSING PIECE :(
-limitSequence = error "TODO: limitSequence"  --     (I think)
-limitMapping  = error "TODO: limitMapping"
+limitStream   = id -- error "TODO: limitStream"
+limitDocument = id -- error "TODO: limitDocument"
+limitNode     = id -- error "TODO: limitNode"      -- <-- THE SINGLE MISSING PIECE :(
+limitSequence = id -- error "TODO: limitSequence"  --     (I think)
+limitMapping  = id -- error "TODO: limitMapping"
 
 -- | Skip an event equal to the one supplied. (and fail on any other event)
 eventEq :: Event -> Ignore
