@@ -1,6 +1,13 @@
 attempt1
 attempt2
+attempt3
+attempt4
+attempt5
+attempt6
+attempt7
+attempt8
 *.hp
+*.ps
 *.prof
 *.aux
 *.hi
