@@ -8,7 +8,14 @@ I have *identified the source* of the high memory usage:  the initial constructi
 
 Unfortunately, this initial Value seems to be central to pretty much the entire Aeson API, so *I'm now trying to work around it with streaming APIs.*  This is not fun.
 
-There currently appears to be a *[[https://github.com/ExpHP/haskell-memory-halp/blob/master/app/Attempt4.hs#L269-L282][single missing piece]]* before I can finally test what I've written.  It should take a continuation parser of type [[https://hackage.haskell.org/package/conduit-parse-0.1.2.0/docs/Data-Conduit-Parser.html][ConduitParser Event m a]] and supply it with the events of exactly one node from the [[https://hackage.haskell.org/package/yaml-0.8.22/docs/Text-Libyaml.html][Libyaml stream]] (leaving the rest of the stream after this node undisturbed).
+There currently appears to be a *[[https://github.com/ExpHP/haskell-memory-halp/blob/master/app/Attempt4.hs#L269-L282][single missing piece]]* before I can finally test what I've written:
+
+#+BEGIN_SRC haskell
+limitNode :: ConduitParser Event m a -> ConduitParser Event m a
+limitNode cont = error "TODO"
+#+END_SRC haskell
+
+It should take a continuation parser of type [[https://hackage.haskell.org/package/conduit-parse-0.1.2.0/docs/Data-Conduit-Parser.html][ConduitParser]] and supply it with the events of exactly one node from the [[https://hackage.haskell.org/package/yaml-0.8.22/docs/Text-Libyaml.html][Libyaml stream]] (leaving the rest of the stream after this node undisturbed), serving a purpose analogous to ~takeExactlyC~.
 
 Notice that:
 
