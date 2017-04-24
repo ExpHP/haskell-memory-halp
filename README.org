@@ -15,7 +15,7 @@ limitNode :: ConduitParser Event m a -> ConduitParser Event m a
 limitNode cont = error "TODO"
 #+END_SRC haskell
 
-It should take a continuation parser of type [[https://hackage.haskell.org/package/conduit-parse-0.1.2.0/docs/Data-Conduit-Parser.html][ConduitParser]] and supply it with the events of exactly one node from the [[https://hackage.haskell.org/package/yaml-0.8.22/docs/Text-Libyaml.html][Libyaml stream]] (leaving the rest of the stream after this node undisturbed), serving a purpose analogous to ~takeExactlyC~.
+It should take a continuation parser of type [[https://hackage.haskell.org/package/conduit-parse-0.1.2.0/docs/Data-Conduit-Parser.html][ConduitParser]] and supply it with the events of exactly one [[http://pyyaml.org/wiki/LibYAML#Events][node]] from the [[https://hackage.haskell.org/package/yaml-0.8.22/docs/Text-Libyaml.html][Libyaml stream]] (leaving the rest of the stream after this node undisturbed), serving a purpose analogous to ~takeExactlyC~.
 
 Notice that:
 
