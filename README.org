@@ -38,21 +38,21 @@ Larger numbers make a bigger file.
 
 ** Files
 
-- app/Attempt1 ::
+- [[https://github.com/ExpHP/haskell-memory-halp/blob/master/app/Attempt1.hs][app/Attempt1]] ::
   *(rendered pointless by Attempt3)*
   attempt using plain data structures that map directly to the YAML.
   (originally handcoded, this has now been rewritten to use Aeson's
   TemplateHaskell functions, with no discernable effect on the outcome)
-- app/Attempt2 ::
+- [[https://github.com/ExpHP/haskell-memory-halp/blob/master/app/Attempt2.hs][app/Attempt2]] ::
   *(rendered pointless by Attempt3)*
   attempt using a fromJSON implementation that extracts only the data I want.
-- app/Attempt3 ::
+- [[https://github.com/ExpHP/haskell-memory-halp/blob/master/app/Attempt3.hs][app/Attempt3]] ::
   I write the trivial parser ~Value -> Parser Value~, and discover that
   *the entire cost lies in constructing the input ~Value~.*
   AFAICT this renders the entire higher-level API of Aeson completely useless.
 
   Shit.
-- app/Attempt4 ::
+- [[https://github.com/ExpHP/haskell-memory-halp/blob/master/app/Attempt4.hs][app/Attempt4]] ::
   I try a streaming approach which uses [[https://hackage.haskell.org/package/yaml-0.8.22/docs/Text-Libyaml.html][Text.Libyaml]] and [[https://hackage.haskell.org/package/conduit-parse-0.1.2.0/docs/Data-Conduit-Parser.html][Data.Conduit.Parser]]
   to parse the desired object directly out of the Libyaml event stream,
   with no intervening Value representation.
