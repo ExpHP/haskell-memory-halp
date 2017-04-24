@@ -13,17 +13,17 @@ stack build --executable-profiling || exit 1
 #      -prof -fprof-auto -fprof-cafs \
 #    || exit 1
 
-stack ghc --ghc-package-path --package=haskell-halp -- \
-	    app/Attempt3.hs -o attempt3 \
-	    -prof -fprof-auto -fprof-cafs \
-	  || exit 1
+# stack ghc --ghc-package-path --package=haskell-halp -- \
+# 	    app/Attempt3.hs -o attempt3 \
+# 	    -prof -fprof-auto -fprof-cafs \
+# 	  || exit 1
 
 stack ghc --ghc-package-path --package=haskell-halp -- \
 	    app/Attempt4.hs -o attempt4 \
 	    -prof -fprof-auto -fprof-cafs \
 	  || exit 1
 
-for s in attempt3 attempt4; do
+for s in attempt4; do
 	echo ">>> getting memory profile of $s <<<"
 	./$s +RTS -hc -RTS "$@"
 	echo ">>> getting prof output of $s <<<"

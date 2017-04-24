@@ -5,7 +5,9 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 import           Prelude hiding (sequence,sequence_)
+import           "base" Debug.Trace
 import           "base" Data.Functor
+import           "base" Data.Foldable hiding (sequence, sequence_)
 import           "base" Data.Function((&))
 import qualified "base" Data.List as List
 import           "base" Data.Complex
@@ -24,9 +26,10 @@ import qualified "unordered-containers" Data.HashMap.Strict as HashMap
 import           "conduit" Data.Conduit -- for... ResourceT? Okay.
 import           "conduit-combinators" Conduit
 import           "transformers" Control.Monad.Trans.Maybe
+import           "deepseq" Control.DeepSeq
 
 import qualified "parsers" Text.Parser.Combinators as Parser
-import           "conduit-parse" Data.Conduit.Parser(ConduitParser)
+import           "conduit-parse" Data.Conduit.Parser(ConduitParser, named)
 import qualified "conduit-parse" Data.Conduit.Parser as ConduitParser
 
 import           SharedJunk
@@ -36,73 +39,91 @@ main = doMain $
     runResourceT $
     runConduitRes $
     LibYaml.decodeFile "band.yaml"
-    .| mapM_C ((>> pure ()) . pure)
 --    .| mapM_C (liftIO . print)
+--    .| takeC 10
+    -- .| mapM_C (liftIO . print)
+    .| (ConduitParser.runConduitParser bandYaml_ $> ())
+    -- .| (ConduitParser.runConduitParser bandYaml >>= liftIO . print)
+--    mapM_C ((>> pure ()) . pure)
 
 type EventParser m a = ConduitParser Event m a
 
 -- | Type of a parser that skips something.
-type Ignore = forall m. (Monad m)=> EventParser m ()
+type Ignore = forall m. (MonadIO m)=> EventParser m ()
 
 -- | Type of unary functions that take a "continuation parser" and supply it
 --    with a modified stream of events.
-type ParserCont = forall m a. (Monad m)=> EventParser m a -> EventParser m a
+type ParserCont = forall m a. (MonadIO m)=> EventParser m a -> EventParser m a
 
 infixl 4 <<
 (<<) :: Applicative m => m a -> m b -> m a
 (<<) = (<*)
 
-bandYaml :: (Monad m)=> EventParser m (Vector (Vector (Vector (Complex Double))))
-bandYaml =
+bandYaml_ :: (MonadIO m)=> EventParser m ()
+bandYaml_ = stream_
+
+bandYaml :: (MonadIO m)=> EventParser m (Vector (Vector (Vector (Complex Double))))
+bandYaml = named "bandYaml" $
     ket                                -- EventParser m (Vector (Complex Double))
     & limitMappingValue "eigenvector"  -- EventParser m (Vector (Complex Double))
     & vector                           -- EventParser m (Vector (Vector (Complex Double)))
     & limitMappingValue "band"         -- EventParser m (Vector (Vector (Complex Double)))
     & vector                           -- EventParser m (Vector (Vector (Vector (Complex Double))))
     & limitMappingValue "phonon"       -- EventParser m (Vector (Vector (Vector (Complex Double))))
+    & bracketDocument
+    & bracketStream
 
-ket :: (Monad m)=> EventParser m (Vector (Complex Double))
-ket =
+ket :: (MonadIO m)=> EventParser m (Vector (Complex Double))
+ket = named "ket" $
     parseTupleWith2 (:+) scalarFloat scalarFloat -- EventParser m (Complex Double)
     & vector         -- each coordinate...       -- EventParser m (Vector (Complex Double))
     & vector         -- each atom...             -- EventParser m (Vector (Vector (Complex Double)))
+    & (>>= (pure $!!))
     & fmap (>>= id)  -- ...as 3N coordinates     -- EventParser m (Vector (Complex Double))
 
-vector :: (Monad m)=> EventParser m a -> EventParser m (Vector a)
-vector p = fmap (Vector.fromList . List.reverse) $ foldl'Sequence (flip (:)) [] p
+vector :: (MonadIO m)=> EventParser m a -> EventParser m (Vector a)
+vector p = named "vector" $
+    fmap (Vector.fromList . List.reverse) $ foldl'Sequence (flip (:)) [] p
 
 ------------------------
 -- The things I ultimately need for the above code to work:
 
--- | Supply the continuation parser with the events for the value associated
---   with a specific key in a mapping.
+-- | Scan a mapping in search for a specific key, and then run the continuation parser
+--   beginning on the first event for the associated value.
 --
+--   The continuation parser must consume exactly the events for a single node.
 --   Failure behavior is not currently specified.
 limitMappingValue :: ByteString -> ParserCont
 limitMappingValue = limitMappingValueImpl -- defined below
 
--- | Read a sequence, running an event parser on the event stream for each
---   individual item.  Take the outputs of this parser and fold them.
+-- | Read a sequence, running an event parser on the event stream beginning at each item.
+--   Take the outputs of this parser and fold them.
 --
+--   The input parser must consume exactly the events for a single node on each run.
 --   Failure behavior is not currently specified.
 --
 --   This version is strict, forcing the evaluation at each step.
-foldl'Sequence :: (Monad m)=> (b -> a -> b) -> b -> EventParser m a -> EventParser m b
+foldl'Sequence :: (MonadIO m)=> (b -> a -> b) -> b -> EventParser m a -> EventParser m b
 foldl'Sequence op init item = bracketAnchorlessSequence (doMany init) where
     doMany b = Parser.try (doSome b) <|> doNone b
     doNone b = pure b
-    doSome b = limitNode item >>= \a -> doMany $! (b `op` a)
+    doSome b = do
+        Parser.notFollowedBy sequenceEnd
+        limitNode item >>= \a -> doMany $! (b `op` a)
 
--- | Parse a sequence of two numeric scalars with a function.
+-- | Parse a sequence of two items with a function.
 --
+--   Each input parser must consume exactly one node.
 --   Failure behavior is not currently specified.
-parseTupleWith2 :: (Monad m)=> (a -> b -> c) -> EventParser m a -> EventParser m b -> EventParser m c
+parseTupleWith2 :: (MonadIO m)=> (a -> b -> c) -> EventParser m a -> EventParser m b -> EventParser m c
 parseTupleWith2 f parseA parseB = bracketAnchorlessSequence $ f <$> parseA <*> parseB
 
 scalarFloat :: (Monad m)=> EventParser m Double
-scalarFloat = eventParse $ \case (EventScalar s FloatTag _ _) -> Just . read . ByteString.unpack $ s
-                                 (EventScalar s IntTag   _ _) -> Just . read . ByteString.unpack $ s
-                                 _ -> Nothing
+scalarFloat = eventParse $ \case (EventScalar s _ _ _) -> mayRead . ByteString.unpack $ s
+                                 _                     -> Nothing
+
+mayRead :: (Read a)=> String -> Maybe a
+mayRead = fmap fst . find ((""==) . snd). reads
 
 ------------------------
 -- Grammar from pyyaml.org.
@@ -133,11 +154,16 @@ sequenceStart_ = eventSatisfy_ $ \case (EventSequenceStart _) -> True; _ -> Fals
 mappingStart_  = eventSatisfy_ $ \case (EventMappingStart _) -> True; _ -> False
 
 stream_, document_, node_, sequence_, mapping_ :: Ignore
-stream_   = bracketStream streamInner_
-document_ = bracketDocument node_
-node_     = alias_ <|> scalar_ <|> sequence_ <|> mapping_
-sequence_ = sequenceStart_ >> sequenceInner_ >> sequenceEnd
-mapping_  = mappingStart_ >> mappingInner_ >> mappingEnd
+stream_   = named "boring stream"   $ bracketStream streamInner_
+document_ = named "boring document" $ bracketDocument node_
+node_     = named "boring node"     $ alias_ <|> scalar_ <|> sequence_ <|> mapping_
+sequence_ = named "boring sequence" $ sequenceStart_ >> sequenceInner_ >> sequenceEnd
+mapping_  = named "boring mapping"  $ mappingStart_ >> mappingInner_ >> mappingEnd
+-- sequence_ = named "boring sequence" $ sequenceStart_ >> traceP "skipping sequence" >> sequenceInner_ >> sequenceEnd
+-- mapping_  = named "boring mapping"  $ mappingStart_ >> traceP "skipping mapping" >> mappingInner_ >> mappingEnd
+
+traceP :: (MonadIO io) => String -> io ()
+traceP = liftIO . traceIO
 
 streamInner_, sequenceInner_, mappingInner_ :: Ignore
 streamInner_   = Parser.skipMany document_
@@ -151,7 +177,8 @@ alias_  = eventSatisfy_ $ \case (EventAlias _)        -> True; _ -> False
 -- NOTE: Should take Text but I don't want to deal with encodings.
 --       (LibYaml appears to support utf8, utf16le, and utf16be)
 scalarStringLiteral_ :: ByteString -> Ignore
-scalarStringLiteral_ x = eventSatisfy_ $ \case (EventScalar bs StrTag _ _) -> bs == x;  _ -> False
+-- scalarStringLiteral_ x = eventSatisfy_ $ \case (EventScalar bs _ _ _) -> trace (ByteString.unpack bs) bs == x;  _ -> False
+scalarStringLiteral_ x = eventSatisfy_ $ \case (EventScalar bs _ _ _) -> bs == x;  _ -> False
 
 -- ------------------------
 -- -- Event conduits. (FML)
@@ -244,14 +271,16 @@ scalarStringLiteral_ x = eventSatisfy_ $ \case (EventScalar bs StrTag _ _) -> bs
 
 ------------------------
 -- Helpers for the pair-delimited nonterminals
-bracketStream   = Parser.between streamStart streamEnd     :: ParserCont
-bracketDocument = Parser.between documentStart documentEnd :: ParserCont
+bracketStream, bracketDocument :: ParserCont
+bracketStream   = Parser.between streamStart streamEnd
+bracketDocument = Parser.between documentStart documentEnd
 
 -- I currently do not stand to benefit in any fashion from supporting anchors.
 -- These are used in places where an anchor COULD meaningfully affect parsing,
 --  but are not explicitly supported by this module.
-bracketAnchorlessSequence = Parser.between anchorlessSequenceStart sequenceEnd :: ParserCont
-bracketAnchorlessMapping = Parser.between anchorlessMappingStart mappingEnd    :: ParserCont
+bracketAnchorlessSequence, bracketAnchorlessMapping :: ParserCont
+bracketAnchorlessSequence = Parser.between anchorlessSequenceStart sequenceEnd
+bracketAnchorlessMapping = Parser.between anchorlessMappingStart mappingEnd
 
 ------------------------
 
@@ -260,8 +289,10 @@ bracketAnchorlessMapping = Parser.between anchorlessMappingStart mappingEnd    :
 --
 --   Failure behavior is not currently specified.
 limitMappingValueImpl :: ByteString -> ParserCont
-limitMappingValueImpl label cont = bracketAnchorlessMapping $ succeedEventually
+limitMappingValueImpl label cont = named "mappingValue" parser
   where
+    parser = bracketAnchorlessMapping succeedEventually
+
     succeedEventually = succeedNow <|> succeedLater
     succeedNow = scalarStringLiteral_ label >> limitNode cont << mappingInner_
     succeedLater = node_ >> node_ >> succeedEventually
@@ -291,9 +322,10 @@ eventSatisfy_ pred = eventSatisfy pred $> ()
 
 -- | Parse an event if it satisfies a predicate. (else fail)
 eventSatisfy :: (Monad m)=> (Event -> Bool) -> EventParser m Event
-eventSatisfy pred = Parser.try $ ConduitParser.await >>= \e -> if pred e then pure e else empty
+eventSatisfy pred = ConduitParser.peek >>= \e -> case fmap pred e of Just True -> ConduitParser.await
+                                                                     _         -> Parser.unexpected "not satisfy"
 
 -- | Parse an event into whatever your dreams are made of. (else fail)
 eventParse :: (Monad m)=> (Event -> Maybe a) -> EventParser m a
-eventParse func = Parser.try $ ConduitParser.await >>= \e -> case func e of Just e  -> pure e
-                                                                            Nothing -> empty
+eventParse func = ConduitParser.peek >>= \e -> case e >>= func of Just e  -> ConduitParser.await >> pure e
+                                                                  Nothing -> Parser.unexpected "not parse"
